@@ -253,7 +253,7 @@ def fuse_conv_and_bn(conv, bn):
                           padding=conv.padding,
                           dilation=conv.dilation,
                           groups=conv.groups,
-                          bias=True).requires_grad_(False).to(conv.weight.device)
+                          bias=True).requires_grad_(True).to(conv.weight.device)
 
     # Prepare filters
     w_conv = conv.weight.clone().view(conv.out_channels, -1)
@@ -412,7 +412,7 @@ class ModelEMA:
         self.updates = updates  # number of EMA updates
         self.decay = lambda x: decay * (1 - math.exp(-x / tau))  # decay exponential ramp (to help early epochs)
         for p in self.ema.parameters():
-            p.requires_grad_(False)
+            p.requires_grad_(True)
 
     def update(self, model):
         # Update EMA parameters

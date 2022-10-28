@@ -76,6 +76,15 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
+        precision="bfloat16",
+        # batch_size=1,
+        channels_last=1,
+        num_iter=0,
+        num_warmup=0,
+        profile=False,
+        ipex=False,
+        jit=False,
+        prof=None,
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -96,6 +105,28 @@ def run(
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
+    if channels_last:
+        try:
+            model = model.to(memory_format=torch.channels_last)
+            print("---- Use NHWC model")
+        except Exception as e:
+            print("NHWC failed:", e)
+    if ipex:
+        model.eval()
+        import intel_extension_for_pytorch as ipex
+        if precision == "bfloat16":
+            model = ipex.optimize(model, dtype=torch.bfloat16, inplace=True)
+        else:
+            model = ipex.optimize(model, dtype=torch.float32, inplace=True)
+        print("Running IPEX ...")
+    if jit:
+        try:
+            model = torch.jit.script(model)
+            model = torch.jit.freeze(model)
+            print("---- With JIT enabled.")
+        except Exception as e:
+            print("Jit failed:", e)
+
     # Dataloader
     bs = 1  # batch_size
     if webcam:
@@ -111,7 +142,11 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+    iter_count = 0
+    total_time = 0.0
+    total_sample = 0
     for path, im, im0s, vid_cap, s in dataset:
+        if iter_count > num_iter and num_iter > 0: break
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
             im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
@@ -123,7 +158,8 @@ def run(
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
             pred = model(im, augment=augment, visualize=visualize)
-
+        if profile:
+            prof.step()
         # NMS
         with dt[2]:
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
@@ -201,9 +237,16 @@ def run(
                     vid_writer[i].write(im0)
 
         # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        # LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        print("Iteration: {}, inference time: {} sec.".format(iter_count, dt[1].dt), flush=True)
+        if iter_count >= num_warmup:
+            total_time += dt[1].dt
+            total_sample += bs
+        iter_count += 1
 
     # Print results
+    throughput = total_sample / total_time
+    print("inference Throughput: {} images/s".format(throughput))
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
     if save_txt or save_img:
@@ -242,17 +285,60 @@ def parse_opt():
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
+    parser.add_argument('--precision', type=str, default="bfloat16")
+    # parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--channels_last', type=int, default=1)
+    parser.add_argument('--num_iter', type=int, default=0)
+    parser.add_argument('--num_warmup', type=int, default=0)
+    parser.add_argument('--profile', action='store_true', help='profile')
+    parser.add_argument('--ipex', action='store_true', help='ipex')
+    parser.add_argument('--jit', action='store_true', help='jit')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
     return opt
 
+def trace_handler(p):
+    output = p.key_averages().table(sort_by="self_cpu_time_total")
+    print(output)
+    import pathlib
+    timeline_dir = str(pathlib.Path.cwd()) + '/timeline/'
+    if not os.path.exists(timeline_dir):
+        try:
+            os.makedirs(timeline_dir)
+        except:
+            pass
+    timeline_file = timeline_dir + 'timeline-' + str(torch.backends.quantized.engine) + '-' + \
+                'Yolov5-' + str(p.step_num) + '-' + str(os.getpid()) + '.json'
+    p.export_chrome_trace(timeline_file)
+
 
 def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
+    print(vars(opt))
+    if opt.profile:
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            record_shapes=True,
+            schedule=torch.profiler.schedule(
+                wait=int(opt.num_iter/2),
+                warmup=2,
+                active=1,
+            ),
+            on_trace_ready=trace_handler,
+        ) as prof:
+            run(**vars(opt), prof=prof)
+    else:
+        run(**vars(opt))
 
 
 if __name__ == "__main__":
     opt = parse_opt()
-    main(opt)
+    if opt.precision == "bfloat16":
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            main(opt)
+    elif opt.precision == "float16":
+        with torch.cuda.amp.autocast(enabled=True, dtype=torch.float16):
+            main(opt)
+    else:
+        main(opt)
