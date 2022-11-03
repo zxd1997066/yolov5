@@ -317,8 +317,9 @@ def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
     print(vars(opt))
     if opt.profile:
+        prof_act = [torch.profiler.ProfilerActivity.CUDA, torch.profiler.ProfilerActivity.CPU]
         with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU],
+            activities=prof_act,
             record_shapes=True,
             schedule=torch.profiler.schedule(
                 wait=int(opt.num_iter/2),
