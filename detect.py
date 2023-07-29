@@ -116,6 +116,8 @@ def run(
         import intel_extension_for_pytorch as ipex
         if precision == "bfloat16":
             model = ipex.optimize(model, dtype=torch.bfloat16, inplace=True)
+        elif precision == "float16":
+            model = ipex.optimize(model, dtype=torch.half, inplace=True)
         else:
             model = ipex.optimize(model, dtype=torch.float32, inplace=True)
         print("Running IPEX ...")
@@ -342,7 +344,7 @@ if __name__ == "__main__":
             main(opt)
     elif opt.precision == "float16":
         print("---- Use cuda AMP float16")
-        with torch.cuda.amp.autocast(enabled=True, dtype=torch.float16):
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
             main(opt)
     else:
         main(opt)
