@@ -111,7 +111,7 @@ def run(
             print("---- Use NHWC model")
         except Exception as e:
             print("NHWC failed:", e)
-    if args.compile:
+    if compile:
         model = torch.compile(model, backend=args.backend, options={"freezing": True})
     if ipex:
         model.eval()
