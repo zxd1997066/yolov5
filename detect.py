@@ -86,7 +86,8 @@ def run(
         jit=False,
         prof=None,
         compile=False,
-        backend='inductor'
+        backend='inductor',
+        device_oob='cpu'
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -164,7 +165,10 @@ def run(
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
             pred = model(im, augment=augment, visualize=visualize)
-            if torch.cuda.is_available(): torch.cuda.synchronize()
+            if torch.cuda.is_available(): 
+                torch.cuda.synchronize()
+                device_oob='cuda'
+                
         if profile:
             prof.step()
         # NMS
@@ -304,6 +308,8 @@ def parse_opt():
                     help="enable torch.compile")
     parser.add_argument("--backend", type=str, default='inductor',
                     help="enable torch.compile backend")
+    parser.add_argument("--device_oob", type=str, default='cpu',
+                    help="cpu or cuda")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
@@ -351,8 +357,13 @@ if __name__ == "__main__":
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             main(opt)
     elif opt.precision == "float16":
-        print("---- Use cuda AMP float16")
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
-            main(opt)
+        if opt.device_oob == "cpu":
+            print("---- Use cpu AMP float16")
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+                main(opt)
+        elif opt.device_oob == "cuda":
+            print("---- Use cpu AMP float16")
+            with torch.cuda.amp.autocast(enabled=True, dtype=torch.half):
+                main(opt)
     else:
         main(opt)
