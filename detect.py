@@ -85,6 +85,8 @@ def run(
         ipex=False,
         jit=False,
         prof=None,
+        compile=False,
+        backend='inductor'
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -112,7 +114,7 @@ def run(
         except Exception as e:
             print("NHWC failed:", e)
     if compile:
-        model = torch.compile(model, backend=args.backend, options={"freezing": True})
+        model = torch.compile(model, backend=backend, options={"freezing": True})
     if ipex:
         model.eval()
         import intel_extension_for_pytorch as ipex
