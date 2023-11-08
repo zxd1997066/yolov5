@@ -111,6 +111,8 @@ def run(
             print("---- Use NHWC model")
         except Exception as e:
             print("NHWC failed:", e)
+    if args.compile:
+        model = torch.compile(model, backend=args.backend, options={"freezing": True})
     if ipex:
         model.eval()
         import intel_extension_for_pytorch as ipex
@@ -296,6 +298,10 @@ def parse_opt():
     parser.add_argument('--profile', action='store_true', help='profile')
     parser.add_argument('--ipex', action='store_true', help='ipex')
     parser.add_argument('--jit', action='store_true', help='jit')
+    parser.add_argument("--compile", action='store_true', default=False,
+                    help="enable torch.compile")
+    parser.add_argument("--backend", type=str, default='inductor',
+                    help="enable torch.compile backend")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
