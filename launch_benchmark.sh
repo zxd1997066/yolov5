@@ -35,7 +35,7 @@ function main {
         python detect.py --nosave --device $device_id \
             --weights $CKPT_DIR --source $DATASET_DIR \
             --num_iter 3 --num_warmup 1 \
-            --channels_last $channels_last --precision $precision \
+            --channels_last $channels_last --precision $precision --device_oob $device \
             ${addtion_options}
         #
         for batch_size in ${batch_size_list[@]}
@@ -80,7 +80,7 @@ function generate_core {
             python detect.py --nosave --device $device_id \
                 --weights $CKPT_DIR --source $DATASET_DIR \
                 --num_iter $num_iter --num_warmup $num_warmup \
-                --channels_last $channels_last --precision $precision \
+                --channels_last $channels_last --precision $precision --device_oob $device \
                 ${addtion_options} \
         > ${log_file} 2>&1 &  \n" |tee -a ${excute_cmd_file}
         if [ "${numa_nodes_use}" == "0" ];then
@@ -106,7 +106,7 @@ function generate_core_launcher {
             detect.py --nosave --device cpu \
                 --weights $CKPT_DIR --source $DATASET_DIR \
                 --num_iter $num_iter --num_warmup $num_warmup \
-                --channels_last $channels_last --precision $precision \
+                --channels_last $channels_last --precision $precision --device_oob $device \
                 ${addtion_options} \
         > /dev/null 2>&1 &  \n" |tee -a ${excute_cmd_file}
         break
