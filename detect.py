@@ -354,12 +354,12 @@ if __name__ == "__main__":
     opt = parse_opt()
     if opt.precision == "bfloat16":
         print("---- Use cpu AMP bfloat16")
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.bfloat16):
             main(opt)
     elif opt.precision == "float16":
         if opt.device_oob == "cpu":
             print("---- Use cpu AMP float16")
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+            with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.half):
                 main(opt)
         elif opt.device_oob == "cuda":
             print("---- Use cpu AMP float16")
