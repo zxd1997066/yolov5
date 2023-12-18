@@ -362,7 +362,7 @@ if __name__ == "__main__":
             with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.half):
                 main(opt)
         elif opt.device_oob == "cuda":
-            print("---- Use cpu AMP float16")
+            print("---- Use cuda AMP float16")
             with torch.cuda.amp.autocast(enabled=True, dtype=torch.half):
                 main(opt)
     else:
