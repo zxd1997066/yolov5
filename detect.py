@@ -77,7 +77,7 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
         precision="bfloat16",
-        # batch_size=1,
+        batch_size=1,
         channels_last=1,
         num_iter=0,
         num_warmup=0,
@@ -297,7 +297,7 @@ def parse_opt():
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
     parser.add_argument('--precision', type=str, default="bfloat16")
-    # parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=1)
     parser.add_argument('--channels_last', type=int, default=1)
     parser.add_argument('--num_iter', type=int, default=0)
     parser.add_argument('--num_warmup', type=int, default=0)
