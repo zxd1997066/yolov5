@@ -110,10 +110,13 @@ def run(
 
     if channels_last:
         try:
-            model = model.to(memory_format=torch.channels_last)
+            model_cl = model.to(memory_format=torch.channels_last)
             print("---- Use NHWC model")
-        except Exception as e:
-            print("NHWC failed:", e)
+        except:
+            print("NHWC failed:")
+            model_cl = model
+        finally:
+            mdoel = model_cl
     if compile:
         model = torch.compile(model, backend=backend, options={"freezing": True})
     if ipex:
