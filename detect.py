@@ -86,6 +86,7 @@ def run(
         jit=False,
         prof=None,
         compile=False,
+        triton_cpu=False,
         backend='inductor',
         device_oob='cpu'
 ):
@@ -107,7 +108,10 @@ def run(
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
-
+    if triton_cpu:
+        print("run with triton cpu backend")
+        import torch._inductor.config
+        torch._inductor.config.cpu_backend="triton"
     if channels_last:
         try:
             model_cl = model.to(memory_format=torch.channels_last)
@@ -313,6 +317,8 @@ def parse_opt():
                     help="enable torch.compile backend")
     parser.add_argument("--device_oob", type=str, default='cpu',
                     help="cpu or cuda")
+    parser.add_argument("--triton_cpu", action='store_true', default=False,
+                    help="enable triton_cpu")
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
