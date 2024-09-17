@@ -108,6 +108,7 @@ def run(
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
+    import torch
     if triton_cpu:
         print("run with triton cpu backend")
         import torch._inductor.config
